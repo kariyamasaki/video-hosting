@@ -1,6 +1,7 @@
 <?php
 session_start();
 
+// Настройки базы данных
 $host = 'localhost';
 $dbname = 'video_hosting';
 $username = 'root';

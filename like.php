@@ -2,13 +2,14 @@
 require_once 'config.php';
 
 if (!isLoggedIn()) {
+    header('Content-Type: application/json');
     echo json_encode(['success' => false]);
     exit();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user_id = getUserID();
-    $video_id = $_POST['video_id'];
+    $video_id = $_POST['video_id'] ?? 0;
     
     // Проверяем, есть ли уже лайк
     $stmt = $pdo->prepare("SELECT id FROM likes WHERE user_id = ? AND video_id = ?");
@@ -31,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$video_id]);
     $result = $stmt->fetch();
     
+    header('Content-Type: application/json');
     echo json_encode([
         'success' => true,
         'action' => $action,
