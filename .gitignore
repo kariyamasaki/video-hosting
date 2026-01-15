@@ -1,0 +1,46 @@
+# Конфигурационные файлы
+config/config.php
+.env
+*.env.local
+
+# Загруженные файлы пользователей
+/uploads/
+!/uploads/.gitkeep
+
+# Логи
+*.log
+error_log
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE файлы
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Временные файлы
+*.tmp
+*.temp
+
+# Бэкапы базы данных
+/database/backup/
+*.sql
+
+# Зависимости
+/vendor/
+/node_modules/
+
+# Сессии
+*sess*
+
+# Кэш
+*.cache
+
+# Крупные файлы
+*.zip
+*.rar
+*.tar.gz
