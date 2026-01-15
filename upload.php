@@ -1,124 +1,86 @@
 <?php
-require_once 'config.php';
+// upload.php - УПРОЩЕННЫЙ И РАБОЧИЙ
+session_start();
 
-// Проверяем авторизацию
-if (!isLoggedIn()) {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Not authorized']);
+// Подключение к базе данных
+$host = 'localhost';
+$dbname = 'video_hosting';
+$username = 'root';
+$password = '';
+
+// Создаем подключение
+$pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+// Устанавливаем заголовок JSON
+header('Content-Type: application/json');
+
+// Проверка авторизации
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Требуется авторизация']);
     exit();
 }
 
-// Обрабатываем только POST запросы
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
-    exit();
-}
-
-// Проверяем загружен ли файл
-if (!isset($_FILES['video']) || $_FILES['video']['error'] !== UPLOAD_ERR_OK) {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'No file uploaded or upload error']);
-    exit();
-}
-
-// Получаем данные формы
-$title = $_POST['title'] ?? 'Untitled Video';
-$description = $_POST['description'] ?? '';
 $user_id = $_SESSION['user_id'];
 
-// Проверяем расширение файла
-$allowedExtensions = ['mp4', 'avi', 'mov', 'wmv'];
-$filename = $_FILES['video']['name'];
-$extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-
-if (!in_array($extension, $allowedExtensions)) {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Invalid file type. Allowed: MP4, AVI, MOV, WMV']);
+// Проверка метода
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success' => false, 'message' => 'Неверный метод']);
     exit();
 }
 
-// Проверяем размер файла (100MB максимум)
-$maxFileSize = 100 * 1024 * 1024; // 100MB
-if ($_FILES['video']['size'] > $maxFileSize) {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'File is too large. Maximum size: 100MB']);
+// Проверка файла
+if (!isset($_FILES['video']) || $_FILES['video']['error'] !== 0) {
+    echo json_encode(['success' => false, 'message' => 'Ошибка загрузки файла']);
     exit();
 }
 
-// Создаем папки если не существуют
-if (!file_exists('uploads/videos')) {
-    mkdir('uploads/videos', 0777, true);
-}
-if (!file_exists('uploads/thumbnails')) {
-    mkdir('uploads/thumbnails', 0777, true);
-}
+// Получаем данные
+$title = $_POST['title'] ?? 'Без названия';
+$description = $_POST['description'] ?? '';
+$file = $_FILES['video'];
 
-// Генерируем уникальное имя файла
-$uniqueName = uniqid() . '_' . preg_replace('/[^a-zA-Z0-9\._-]/', '', $filename);
-$targetPath = 'uploads/videos/' . $uniqueName;
+// Создаем папки если нет
+if (!is_dir('uploads')) mkdir('uploads');
+if (!is_dir('uploads/videos')) mkdir('uploads/videos', 0777, true);
+if (!is_dir('uploads/thumbnails')) mkdir('uploads/thumbnails', 0777, true);
 
-// Перемещаем загруженный файл
-if (move_uploaded_file($_FILES['video']['tmp_name'], $targetPath)) {
-    // Генерируем миниатюру (простой вариант)
-    $thumbnail = generateThumbnail($uniqueName);
+// Генерируем имя файла
+$filename = time() . '_' . rand(1000, 9999) . '.mp4';
+$target_path = 'uploads/videos/' . $filename;
+
+// Сохраняем файл
+if (move_uploaded_file($file['tmp_name'], $target_path)) {
     
-    // Сохраняем в базу данных
-    try {
-        $stmt = $pdo->prepare("
-            INSERT INTO videos (title, description, filename, thumbnail, user_id, uploaded_at) 
-            VALUES (?, ?, ?, ?, ?, NOW())
-        ");
-        $stmt->execute([$title, $description, $uniqueName, $thumbnail, $user_id]);
-        
-        $video_id = $pdo->lastInsertId();
-        
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => true,
-            'message' => 'Video uploaded successfully!',
-            'video_id' => $video_id
-        ]);
-        
-    } catch (PDOException $e) {
-        // Удаляем загруженный файл если ошибка БД
-        unlink($targetPath);
-        
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-    }
+    // Создаем миниатюру
+    $thumbnail = 'thumbnail_' . time() . '.jpg';
+    $thumb_path = 'uploads/thumbnails/' . $thumbnail;
+    
+    // Простая миниатюра
+    $img = imagecreatetruecolor(320, 180);
+    $bg = imagecolorallocate($img, 255, 0, 0); // Красный фон
+    imagefilledrectangle($img, 0, 0, 320, 180, $bg);
+    imagejpeg($img, $thumb_path, 80);
+    imagedestroy($img);
+    
+    // Сохраняем в базу
+    $stmt = $pdo->prepare("
+        INSERT INTO videos (title, description, filename, thumbnail, user_id, uploaded_at) 
+        VALUES (?, ?, ?, ?, ?, NOW())
+    ");
+    
+    $stmt->execute([$title, $description, $filename, $thumbnail, $user_id]);
+    
+    // УСПЕШНЫЙ ОТВЕТ
+    $response = [
+        'success' => true,
+        'message' => 'Видео загружено успешно!',
+        'filename' => $filename
+    ];
+    
+    echo json_encode($response);
     
 } else {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Failed to save file']);
-}
-
-function generateThumbnail($filename) {
-    $thumbnailName = pathinfo($filename, PATHINFO_FILENAME) . '.jpg';
-    $thumbnailPath = 'uploads/thumbnails/' . $thumbnailName;
-    
-    // Создаем простую миниатюру (черный прямоугольник с текстом)
-    $im = imagecreatetruecolor(320, 180);
-    $bgColor = imagecolorallocate($im, 40, 40, 40);
-    imagefilledrectangle($im, 0, 0, 320, 180, $bgColor);
-    
-    // Добавляем иконку видео
-    $iconColor = imagecolorallocate($im, 255, 0, 0);
-    $centerX = 160;
-    $centerY = 90;
-    
-    // Рисуем треугольник (play icon)
-    $points = [
-        $centerX - 20, $centerY - 20,
-        $centerX - 20, $centerY + 20,
-        $centerX + 20, $centerY
-    ];
-    imagefilledpolygon($im, $points, 3, $iconColor);
-    
-    // Сохраняем изображение
-    imagejpeg($im, $thumbnailPath, 80);
-    imagedestroy($im);
-    
-    return $thumbnailName;
+    echo json_encode(['success' => false, 'message' => 'Ошибка сохранения файла']);
 }
 ?>

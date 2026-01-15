@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Дебаг ответа</title>
+</head>
+<body>
+    <h2>Тест ответа сервера</h2>
+    <button onclick="testJSON()">Тест чистого JSON</button>
+    <button onclick="testUpload()">Тест загрузки</button>
+    
+    <div id="result" style="margin-top: 20px; padding: 10px; background: #f0f0f0; white-space: pre-wrap;"></div>
+    
+    <script>
+        function testJSON() {
+            fetch('test_json.php')
+                .then(r => r.text())
+                .then(text => {
+                    document.getElementById('result').textContent = 'Ответ: ' + text;
+                    console.log('JSON ответ:', text);
+                    
+                    try {
+                        JSON.parse(text);
+                        alert('✅ JSON валидный!');
+                    } catch(e) {
+                        alert('❌ Ошибка JSON: ' + e.message);
+                    }
+                });
+        }
+        
+        function testUpload() {
+            // Создаем тестовую форму
+            const formData = new FormData();
+            formData.append('title', 'Тест');
+            formData.append('description', 'Тестовое описание');
+            
+            // Добавляем пустой файл
+            const blob = new Blob(['test video content'], {type: 'video/mp4'});
+            formData.append('video', blob, 'test.mp4');
+            
+            // Отправляем
+            fetch('upload_clean.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.text())
+            .then(text => {
+                document.getElementById('result').textContent = 'Ответ: ' + text;
+                console.log('Upload ответ:', text);
+                
+                try {
+                    const data = JSON.parse(text);
+                    alert(data.success ? '✅ Успех!' : '❌ Ошибка: ' + data.message);
+                } catch(e) {
+                    alert('❌ Ошибка парсинга JSON');
+                }
+            })
+            .catch(err => {
+                alert('Ошибка сети: ' + err.message);
+            });
+        }
+    </script>
+</body>
+</html>
